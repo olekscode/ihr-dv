@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>img/Dictionary.png</file>
+        <file>img/kaydet.png</file>
+        <file>img/open_folder_orange.png</file>
+        <file>img/copy.png</file>
+        <file>img/Cut-icon.png</file>
+        <file>img/document_add.png</file>
+        <file>img/Gnome-Edit-Delete-64.png</file>
+        <file>img/Paste.png</file>
+        <file>img/Redo-icon.png</file>
+        <file>img/Undo-icon.png</file>
+    </qresource>
+</RCC>
