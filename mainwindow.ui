@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>566</width>
+    <width>623</width>
     <height>400</height>
    </rect>
   </property>
@@ -73,7 +73,7 @@
       </property>
      </widget>
     </item>
-    <item row="0" column="3" colspan="2">
+    <item row="0" column="3" colspan="3">
      <widget class="QLineEdit" name="lineEdit">
       <property name="minimumSize">
        <size>
@@ -83,7 +83,7 @@
       </property>
      </widget>
     </item>
-    <item row="0" column="5">
+    <item row="0" column="6">
      <widget class="QPushButton" name="searchButton">
       <property name="minimumSize">
        <size>
@@ -102,7 +102,7 @@
       </property>
      </widget>
     </item>
-    <item row="1" column="1" colspan="5">
+    <item row="1" column="1" colspan="6">
      <widget class="QTextBrowser" name="textBrowser">
       <property name="minimumSize">
        <size>
@@ -119,6 +119,13 @@
      </widget>
     </item>
     <item row="2" column="1" colspan="3">
+     <widget class="QPushButton" name="verifyButton">
+      <property name="text">
+       <string>Verify</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="4">
      <spacer name="horizontalSpacer">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
@@ -131,14 +138,7 @@
       </property>
      </spacer>
     </item>
-    <item row="3" column="1" colspan="5">
-     <widget class="QTableView" name="tableView">
-      <property name="sizeAdjustPolicy">
-       <enum>QAbstractScrollArea::AdjustIgnored</enum>
-      </property>
-     </widget>
-    </item>
-    <item row="2" column="4">
+    <item row="2" column="5">
      <widget class="QPushButton" name="editButton">
       <property name="maximumSize">
        <size>
@@ -151,7 +151,7 @@
       </property>
      </widget>
     </item>
-    <item row="2" column="5">
+    <item row="2" column="6">
      <widget class="QPushButton" name="deleteButton">
       <property name="minimumSize">
        <size>
@@ -170,6 +170,13 @@
       </property>
      </widget>
     </item>
+    <item row="3" column="1" colspan="6">
+     <widget class="QTableView" name="tableView">
+      <property name="sizeAdjustPolicy">
+       <enum>QAbstractScrollArea::AdjustIgnored</enum>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
@@ -178,7 +185,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>566</width>
+     <width>623</width>
      <height>25</height>
     </rect>
    </property>
@@ -222,15 +229,18 @@
     <addaction name="separator"/>
     <addaction name="actionDelete"/>
    </widget>
-   <widget class="QMenu" name="menuSearch">
+   <widget class="QMenu" name="menuTranslate">
     <property name="title">
-     <string>Search</string>
+     <string>Translate</string>
     </property>
+    <addaction name="actionGoogle_Translate_Mode"/>
+    <addaction name="actionMagic"/>
+    <addaction name="actionShow_Unverified"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
-   <addaction name="menuSearch"/>
+   <addaction name="menuTranslate"/>
    <addaction name="menuHelp"/>
   </widget>
   <action name="actionAs_solid_dictionary">
@@ -322,6 +332,27 @@
    </property>
    <property name="text">
     <string>Delete</string>
+   </property>
+  </action>
+  <action name="actionGoogle_Translate_Mode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Google Translate Mode</string>
+   </property>
+  </action>
+  <action name="actionMagic">
+   <property name="text">
+    <string>Magic</string>
+   </property>
+  </action>
+  <action name="actionShow_Unverified">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show Unverified</string>
    </property>
   </action>
  </widget>

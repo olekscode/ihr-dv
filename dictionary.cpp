@@ -12,18 +12,25 @@ Dictionary* Dictionary::instance()
     return mInstance;
 }
 
-void Dictionary::add(const QString &word, const QList<QString> &translations, const QSet<float> &usages)
+void Dictionary::add(const QString &word, const QList<QString> &translations, const QSet<float> &usages, bool verified)
 {
     QPair<QList<QString>, QSet<float>> pair;
     pair.first = translations;
     pair.second = usages;
 
     mDict.insert(word, pair);
+    tempVerified.insert(word, verified);
 }
 
 void Dictionary::addTranslation(const QString &word, const QString &transl)
 {
     mDict[word].first.append(transl);
+}
+
+void Dictionary::setTranslations(const QString &word, const QList<QString> &translations, bool verified)
+{
+    mDict[word].first = translations;
+    tempVerified.insert(word, verified);
 }
 
 void Dictionary::addUsage(const QString &word, const float &usage)
@@ -49,6 +56,11 @@ QSet<float> Dictionary::usages(const QString &word) const
 bool Dictionary::contains(const QString &word) const
 {
     return mDict.contains(word);
+}
+
+bool Dictionary::isVerified(const QString &word) const
+{
+    return tempVerified[word];
 }
 
 int Dictionary::size() const

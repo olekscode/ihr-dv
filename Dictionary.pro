@@ -5,6 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui
+QT       += network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -16,15 +17,18 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     newword.cpp \
     dictionary.cpp \
-    unknownwords.cpp
+    unknownwords.cpp \
+    verifyingdialog.cpp
 
 HEADERS  += mainwindow.h \
     newword.h \
     dictionary.h \
-    unknownwords.h
+    unknownwords.h \
+    verifyingdialog.h
 
 FORMS    += mainwindow.ui \
-    newword.ui
+    newword.ui \
+    verifyingdialog.ui
 
 CONFIG += c++11
 

@@ -14,6 +14,13 @@
 #include <QStandardItem>
 #include <QStandardItemModel>
 #include <QStringListModel>
+#include <QWidgetAction>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkRequest>
+#include <QtNetwork/QNetworkReply>
+#include <QEvent>
+#include <QSignalMapper>
+
 
 #include <string>
 #include <sstream>
@@ -23,6 +30,7 @@
 #include "dictionary.h"
 #include "unknownwords.h"
 #include "newword.h"
+#include "verifyingdialog.h"
 
 namespace Ui {
 class MainWindow;
@@ -49,7 +57,7 @@ private slots:
 
     void saveNewWord();
 
-    void translateUnknown(QModelIndex);
+    void translateUnknown(QModelIndex index);
 
     void saveTranslatedUnknown();
 
@@ -63,9 +71,26 @@ private slots:
 
     void on_actionSave_triggered();
 
+    void buildTable(const QString &beginsWith = QString());
+
+    void buildUnknownList();
+
+    void on_actionGoogle_Translate_Mode_triggered(bool checked);
+
+    void on_actionMagic_triggered();
+
+    void on_verifyButton_clicked();
+
+    void saveVerifiedTranslation();
+
+    void on_actionShow_Unverified_triggered();
+
+    void showItemFromTable(QModelIndex index);
+
 private:
     Ui::MainWindow *ui;
     NewWord* newWordDialog;
+    VerifyingDialog* verifyDialog;
     QStandardItemModel* tableModel;
     QStringListModel* unknownListModel;
     int numOfSaved;
@@ -73,15 +98,17 @@ private:
     //avoid this
     QString prevTextWhenChanged;
     QString dir;
+    bool googleTranslateMode;
 
     bool getDictFromFile();
     void saveDictInFile() const;
     void deleteWord(const QString &word);
-    void buildTable();
-    void buildUnknownList();
     float usageAsFloat() const;
     void disableDictActions(const bool &trigger);
+    QList<QString> googleTranslate(QString keyword, QString from, QString to);
+    void unknownGoogleTranslate();
 
+//    bool eventFilter(QObject *object, QEvent *event);
     void resizeEvent(QResizeEvent* event);
 };
 

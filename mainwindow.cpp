@@ -8,11 +8,32 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     newWordDialog = new NewWord(this);
+    verifyDialog = new VerifyingDialog(this);
     dir = QString();
+    googleTranslateMode = false;
 
     disableDictActions(true);
 
     connect(newWordDialog, SIGNAL(wordSaved()), this, SLOT(saveNewWord()));
+    connect(verifyDialog, SIGNAL(translationVerified()), this, SLOT(saveVerifiedTranslation()));
+    connect(ui->lineEdit, SIGNAL(returnPressed()), this, SLOT(on_searchButton_clicked()));
+    connect(ui->lineEdit, SIGNAL(textChanged(QString)), this, SLOT(buildTable(QString)));
+    connect(ui->unknownView, SIGNAL(activated(QModelIndex)), this, SLOT(translateUnknown(QModelIndex)));
+    connect(ui->tableView, SIGNAL(doubleClicked(QModelIndex)), this, SLOT(showItemFromTable(QModelIndex)));
+
+//    // to select all text in ui->lineEdit when user doubleclicks on it
+//    ui->lineEdit->installEventFilter(this);
+
+    getDictFromFile();
+
+    numOfSaved = Dictionary::instance()->size();
+    numOfSavedUnk = UnknownWords::instance()->size();
+
+    buildTable();
+    buildUnknownList();
+
+    hideShowUsages();
+    disableDictActions(false);
 }
 
 MainWindow::~MainWindow()
@@ -30,6 +51,18 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+//bool MainWindow::eventFilter(QObject *object, QEvent *event)
+//{
+//    // to select all text in ui->lineEdit when user doubleclicks on it
+//    if (object == ui->lineEdit && event->type() == QEvent::MouseButtonDblClick)
+//    {
+//        ui->statusBar->showMessage("Here", 3000);
+//        ui->lineEdit->selectAll();
+//        return false;
+//    }
+//    return false;
+//}
+
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
    QMainWindow::resizeEvent(event);
@@ -38,20 +71,22 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 
 bool MainWindow::getDictFromFile()
 {
+    bool ret;
     QString word;
     QList<QString> transl;
     QSet<float> usages;
+    bool verified;
 
     std::string buff;
     std::string buffItem;
     std::string line;
 
-    QString path = dir + "dictionary.txt";
+    QString path = (dir.isEmpty()) ? "dictionary.txt" : dir + "/dictionary.txt";
     std::ifstream in(path.toStdString());
     if (!in)
     {
         ui->statusBar->showMessage("Empty dictionary", 3000);
-        return false;
+        ret = false;
     }
     else
     {
@@ -72,7 +107,7 @@ bool MainWindow::getDictFromFile()
             while (iss >> buff && buff != "-")
             {
                 buffItem += buff;
-                if (buffItem[buffItem.length() - 1] == ',')
+                if (buffItem[buffItem.length() - 1] == '\\')
                 {
                     buffItem.erase(buffItem.length() - 1, 1);
                     transl.append(QString(buffItem.c_str()));
@@ -91,7 +126,7 @@ bool MainWindow::getDictFromFile()
             while (iss >> buff && buff != "-")
             {
                 buffItem += buff;
-                if (buffItem[buffItem.length() - 1] == ',')
+                if (buffItem[buffItem.length() - 1] == '\\')
                 {
                     buffItem.erase(buffItem.length() - 1);
                     usages.insert(QString(buffItem.c_str()).toFloat());
@@ -107,22 +142,23 @@ bool MainWindow::getDictFromFile()
                 buffItem = "";
             }
 
+            iss >> verified;
+
             if (!word.isEmpty() && word != "--END--")
             {
                 word.remove(word.length() - 1);
-                Dictionary::instance()->add(word, transl, usages);
+                Dictionary::instance()->add(word, transl, usages, verified);
                 transl.clear();
                 usages.clear();
             }
-
-            return true;
         }
+        ret = true;
     }
     in.close();
 
-    path = dir + "unknown.txt";
-    std::ifstream unk(path.toStdString());
+    path = (dir.isEmpty()) ? "unknown.txt" : dir + "/unknown.txt";
 
+    std::ifstream unk(path.toStdString());
     if (unk)
     {
         while (!unk.eof())
@@ -142,7 +178,7 @@ bool MainWindow::getDictFromFile()
             while (iss >> buff && buff != "-")
             {
                 buffItem += buff;
-                if (buffItem[buffItem.length() - 1] == ',')
+                if (buffItem[buffItem.length() - 1] == '\\')
                 {
                     buffItem.erase(buffItem.length() - 1);
                     usages.insert(QString(buffItem.c_str()).toFloat());
@@ -168,29 +204,34 @@ bool MainWindow::getDictFromFile()
     }
 
     unk.close();
+
+    return ret;
 }
 
 void MainWindow::saveDictInFile() const
 {
-    QString path = dir + "dictionary.txt";
+    QString path = (dir.isEmpty()) ? "dictionary.txt" : dir + "/dictionary.txt";
     std::ofstream out(path.toStdString());
+
+    QString word;
     QList<QString> transl;
     QSet<float> usages;
     int counter;
 
     for (auto pair : Dictionary::instance()->toStdMap())
     {
-        out << pair.first.toStdString() << " - ";
+        word = pair.first;
+        out << word.toStdString() << " - ";
 
-        transl = Dictionary::instance()->translations(pair.first);
-        usages = Dictionary::instance()->usages(pair.first);
+        transl = Dictionary::instance()->translations(word);
+        usages = Dictionary::instance()->usages(word);
 
         counter = 0;
         foreach (QString t, transl)
         {
             out << t.toStdString();
             if (counter++ < transl.size() - 1)
-                out << ", ";
+                out << "\\ ";
         }
 
         out << " - ";
@@ -200,15 +241,17 @@ void MainWindow::saveDictInFile() const
         {
             out << QString::number(u).toStdString();
             if (counter++ < usages.size() - 1)
-                out << ", ";
+                out << "\\ ";
         }
+        out << " - ";
+        out << Dictionary::instance()->isVerified(word);
         out << '\n';
     }
     out << "--END--";
 
     out.close();
 
-    path = dir + "unknown.txt";
+    path = (dir.isEmpty()) ? "unknown.txt" : dir + "/unknown.txt";
     std::ofstream unk(path.toStdString());
 
     foreach (auto p, UnknownWords::instance()->toQList())
@@ -221,7 +264,7 @@ void MainWindow::saveDictInFile() const
         {
             unk << QString::number(u).toStdString();
             if (counter++ < usages.size() - 1)
-                unk << ", ";
+                unk << "\\ ";
         }
         unk << '\n';
     }
@@ -235,40 +278,63 @@ void MainWindow::deleteWord(const QString &word)
     Dictionary::instance()->remove(word);
 }
 
-void MainWindow::buildTable()
+void MainWindow::buildTable(const QString &beginsWith)
 {
-    tableModel = new QStandardItemModel(0, 3, this);
+    bool unverified = ui->actionShow_Unverified->isChecked();
+
+    tableModel = new QStandardItemModel(0, 4, this);
     tableModel->setHorizontalHeaderItem(0, new QStandardItem(QString("Word")));
     tableModel->setHorizontalHeaderItem(1, new QStandardItem(QString("Translations")));
     tableModel->setHorizontalHeaderItem(2, new QStandardItem(QString("Usages")));
+    tableModel->setHorizontalHeaderItem(3, new QStandardItem(QString("Verified")));
 
     QString transl = "";
     QString usages = "";
+    QString verified = "";
 
     QList<QStandardItem*> itemsInRow;
+    bool show;
+    bool isVerified;
 
     for (auto pair : Dictionary::instance()->toStdMap())
     {
-        foreach (QString t, pair.second.first)
+        show = true;
+        for (int i = 0; i < beginsWith.length(); ++i)
         {
-            transl += t + ", ";
+            if (pair.first[i] != beginsWith[i])
+            {
+                show = false;
+                break;
+            }
         }
-        transl.remove(transl.size() - 2, 2);
 
-        foreach (float u, pair.second.second)
+        isVerified = Dictionary::instance()->isVerified(pair.first);
+        verified = (isVerified) ? "true" : "false";
+
+        if (show && !(unverified && isVerified))
         {
-            usages += QString::number(u) + ", ";
+            foreach (QString t, pair.second.first)
+            {
+                transl += t + "\\\\";
+            }
+            transl.remove(transl.size() - 2, 2);
+
+            foreach (float u, pair.second.second)
+            {
+                usages += QString::number(u) + ", ";
+            }
+            usages.remove(usages.size() - 2, 2);
+
+            itemsInRow.append(new QStandardItem(pair.first));
+            itemsInRow.append(new QStandardItem(transl));
+            itemsInRow.append(new QStandardItem(usages));
+            itemsInRow.append(new QStandardItem(verified));
+
+            tableModel->appendRow(itemsInRow);
+            itemsInRow.clear();
+            transl = QString();
+            usages = QString();
         }
-        usages.remove(usages.size() - 2, 2);
-
-        itemsInRow.append(new QStandardItem(pair.first));
-        itemsInRow.append(new QStandardItem(transl));
-        itemsInRow.append(new QStandardItem(usages));
-
-        tableModel->appendRow(itemsInRow);
-        itemsInRow.clear();
-        transl = QString();
-        usages = QString();
     }
 
     ui->tableView->setModel(tableModel);
@@ -308,14 +374,28 @@ void MainWindow::on_searchButton_clicked()
 {
     QString word = ui->lineEdit->text();
 
-    if (!Dictionary::instance()->contains(word))
+    if (!word.isEmpty() && !Dictionary::instance()->contains(word))
     {
-        prevTextWhenChanged = ui->lineEdit->text();
+        if (googleTranslateMode)
+        {
+            unknownGoogleTranslate();
+        }
+        else
+        {
+            prevTextWhenChanged = ui->lineEdit->text();
 
-        ui->textBrowser->setText("[Nothing was found]");
-        ui->searchButton->setText("Add");
-        connect(ui->searchButton, SIGNAL(clicked()), this, SLOT(addNewWord()));
-        connect(ui->lineEdit, SIGNAL(textChanged(QString)), this, SLOT(dontAddNewWord()));
+            ui->textBrowser->setText("[Nothing was found]");
+            ui->searchButton->setText("Add");
+
+            QSet<float> usages;
+            usages.insert(usageAsFloat());
+            UnknownWords::instance()->add(prevTextWhenChanged, usages);
+
+            buildUnknownList();
+
+            connect(ui->searchButton, SIGNAL(clicked()), this, SLOT(addNewWord()));
+            connect(ui->lineEdit, SIGNAL(textChanged(QString)), this, SLOT(dontAddNewWord()));
+        }
     }
 
     else
@@ -360,12 +440,6 @@ void MainWindow::dontAddNewWord()
     disconnect(ui->searchButton, SIGNAL(clicked()), 0, 0);
     connect(ui->searchButton, SIGNAL(clicked()), this, SLOT(on_searchButton_clicked()));
     disconnect(ui->lineEdit, SIGNAL(textChanged(QString)), 0, 0);
-
-    QSet<float> usages;
-    usages.insert(usageAsFloat());
-    UnknownWords::instance()->add(prevTextWhenChanged, usages);
-
-    buildUnknownList();
 }
 
 void MainWindow::saveNewWord()
@@ -457,6 +531,17 @@ void MainWindow::saveTranslatedUnknown()
     connect(newWordDialog, SIGNAL(wordSaved()), this, SLOT(saveNewWord()));
 }
 
+void MainWindow::saveVerifiedTranslation()
+{
+    QString word = ui->lineEdit->text();
+    QList<QString> transl = verifyDialog->verified();
+    verifyDialog->close();
+
+    Dictionary::instance()->setTranslations(word, transl, true);
+    buildTable();
+    on_searchButton_clicked();
+}
+
 void MainWindow::on_deleteButton_clicked()
 {
     int question = QMessageBox::question(this, "Deleting", "Are you sure you want to permanently delete this word?");
@@ -501,7 +586,8 @@ void MainWindow::on_actionDivided_in_chapters_triggered()
         }
     }
 
-    std::ofstream out("export.txt");
+    QString path = (dir.isEmpty()) ? "export.txt" : dir + "/export.txt";
+    std::ofstream out(path.toStdString());
 
     int counter;
     for (auto p : dictByUsages.toStdMap())
@@ -529,7 +615,8 @@ void MainWindow::on_actionDivided_in_chapters_triggered()
 
 void MainWindow::on_actionAs_solid_dictionary_triggered()
 {
-    std::ofstream out("export_solid.txt");
+    QString path = (dir.isEmpty()) ? "export_solid.txt" : dir + "/export_solid.txt";
+    std::ofstream out(path.toStdString());
 
     int counter;
     QChar curr = ' ';
@@ -564,12 +651,7 @@ void MainWindow::on_actionAs_solid_dictionary_triggered()
 
 void MainWindow::on_actionOpen_triggered()
 {
-    // TODO: fix it and add filters
-    QFileDialog* getDir = new QFileDialog(this);
-    getDir->show();
-
-    QDir directory = getDir->directory();
-    dir = directory.absolutePath();
+    dir = QFileDialog::getExistingDirectory(this, "Choose the dictionary folder");
 
     if (getDictFromFile())
     {
@@ -593,13 +675,145 @@ void MainWindow::on_actionSave_triggered()
 
 void MainWindow::disableDictActions(const bool &trigger)
 {
-    ui->actionAs_solid_dictionary->setDisabled(trigger);
-    ui->actionDivided_in_chapters->setDisabled(trigger);
-    ui->actionCopy->setDisabled(trigger);
-    ui->actionCut->setDisabled(trigger);
-    ui->actionPaste->setDisabled(trigger);
-    ui->actionDelete->setDisabled(trigger);
-    ui->actionUndo->setDisabled(trigger);
-    ui->actionRedo->setDisabled(trigger);
-    ui->actionSave->setDisabled(trigger);
+    QList<QAction*> dictActions;
+        dictActions.append(ui->actionAs_solid_dictionary);
+        dictActions.append(ui->actionDivided_in_chapters);
+        dictActions.append(ui->actionCopy);
+        dictActions.append(ui->actionCut);
+        dictActions.append(ui->actionPaste);
+        dictActions.append(ui->actionDelete);
+        dictActions.append(ui->actionUndo);
+        dictActions.append(ui->actionRedo);
+        dictActions.append(ui->actionSave);
+
+    QList<QWidget*> dictWidgets;
+        dictWidgets.append(ui->searchButton);
+        dictWidgets.append(ui->editButton);
+        dictWidgets.append(ui->deleteButton);
+        dictWidgets.append(ui->lineEdit);
+        dictWidgets.append(ui->usage1Edit);
+        dictWidgets.append(ui->usage2Edit);
+        dictWidgets.append(ui->tableView);
+        dictWidgets.append(ui->unknownView);
+
+    foreach (QAction* a, dictActions)
+    {
+        a->setDisabled(trigger);
+    }
+
+    foreach (QWidget* w, dictWidgets)
+    {
+        w->setDisabled(trigger);
+    }
+}
+
+QList<QString> MainWindow::googleTranslate(QString keyword, QString from, QString to)
+{
+    //Translate URL
+    QString url = QString("http://translate.google.com/") +
+            "translate_a/t?client=t&text=%0&hl=%1&sl=%2&tl=%1&multires=1&prev=enter&oc=2&ssel=0&tsel=0&uptl=%1&sc=1";
+    url = url.arg(keyword).arg(to).arg(from);
+
+    QNetworkAccessManager manager;
+    QNetworkRequest request(url);
+    QNetworkReply* reply = manager.get(request);
+
+    //Get reply from Google
+    do {
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    } while(!reply->isFinished());
+
+    //Convert to string
+    QString translation(reply->readAll());
+    reply->close();
+
+    QList<QString> transl;
+    QString buff = QString();
+    int level = 0;
+    bool quotesOpened = false;
+
+    foreach (QChar ch, translation)
+    {
+        if (ch == '[') ++level;
+        else if (ch == ']') --level;
+        else if (ch == '"')
+        {
+            if (quotesOpened)
+            {
+                if (level == 5) transl.append(buff);
+                buff = QString();
+            }
+            quotesOpened = !quotesOpened;
+        }
+        else if (ch == ',') buff = QString();
+        else buff += ch;
+    }
+
+    return transl;
+}
+
+void MainWindow::unknownGoogleTranslate()
+{
+    QString word = ui->lineEdit->text();
+    QList<QString> transl = googleTranslate(word, "en", "uk");
+    QSet<float> usages;
+    usages.insert(usageAsFloat());
+
+    QString result = QString();
+    foreach (QString t, transl)
+    {
+        result += t + '\n';
+    }
+
+    ui->textBrowser->setText(result);
+
+    Dictionary::instance()->add(word, transl, usages, false);
+    buildTable();
+}
+
+void MainWindow::on_actionGoogle_Translate_Mode_triggered(bool checked)
+{
+    googleTranslateMode = checked;
+}
+
+void MainWindow::on_actionMagic_triggered()
+{
+    foreach (auto p, UnknownWords::instance()->toQList())
+    {
+        Dictionary::instance()->add(p.first, googleTranslate(p.first, "en", "uk"), p.second, false);
+        UnknownWords::instance()->remove(p.first);
+
+        buildTable();
+        buildUnknownList();
+    }
+}
+
+void MainWindow::on_verifyButton_clicked()
+{
+    QString word = ui->lineEdit->text();
+    QList<QString> unverified = Dictionary::instance()->translations(word);
+
+    verifyDialog->setUnverified(unverified);
+    verifyDialog->show();
+}
+
+void MainWindow::on_actionShow_Unverified_triggered()
+{
+    buildTable();
+}
+
+void MainWindow::showItemFromTable(QModelIndex index)
+{
+    QString word = tableModel->item(index.row())->text();
+    QList<QString> transl = Dictionary::instance()->translations(word);
+
+    ui->lineEdit->setText(word);
+
+    QString result = QString();
+    foreach (QString t, transl)
+    {
+        result += t + '\n';
+    }
+
+    ui->textBrowser->setText(result);
 }
